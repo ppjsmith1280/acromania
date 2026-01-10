@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TV Lobby</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #0b0f14; color: #e9eef5; }
+    .wrap { padding: 28px; }
+    h1 { margin: 0 0 10px; font-size: 34px; }
+    .meta { opacity: 0.8; margin-bottom: 18px; }
+    .card { background: #111926; border-radius: 18px; padding: 18px; }
+    .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+    .count { font-size: 18px; opacity: 0.9; }
+    ul { margin: 14px 0 0; padding: 0 0 0 18px; }
+    li { font-size: 22px; margin: 8px 0; }
+    .hint { margin-top: 14px; opacity: 0.7; }
+    code { background: #0f1622; padding: 2px 6px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Lobby</h1>
+    <div class="meta">Open <code>/phone</code> on each phone and join.</div>
+
+    <div class="card">
+      <div class="row">
+        <div class="count" id="count">Connected: 0</div>
+        <div class="count" id="status">Connecting...</div>
+      </div>
+      <ul id="users"></ul>
+      <div class="hint">Tip: bookmark this page in Silk for quick testing.</div>
+    </div>
+  </div>
+
+<script>
+  const statusEl = document.getElementById("status");
+  const countEl = document.getElementById("count");
+  const usersEl = document.getElementById("users");
+
+  function wsUrl() {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    return `${proto}://${location.host}/ws`;
+  }
+
+  function render(users) {
+    countEl.textContent = `Connected: ${users.length}`;
+    usersEl.innerHTML = users.map(u => `<li>${escapeHtml(u)}</li>`).join("");
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;"
+    }[c]));
+  }
+
+  const ws = new WebSocket(wsUrl());
+
+  ws.onopen = () => {
+    statusEl.textContent = "Connected";
+    ws.send(JSON.stringify({ type: "hello", role: "tv" }));
+  };
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === "lobby") render(msg.users || []);
+    if (msg.type === "error") statusEl.textContent = msg.message;
+  };
+
+  ws.onclose = () => {
+    statusEl.textContent = "Disconnected (refresh)";
+  };
+</script>
+</body>
+</html>
