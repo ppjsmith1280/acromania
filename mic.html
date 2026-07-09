@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mic Visualizer Test</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .wrap {
+      width: min(92vw, 700px);
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    p {
+      color: #ccc;
+      line-height: 1.4;
+    }
+
+    button {
+      font-size: 18px;
+      padding: 14px 22px;
+      border: 0;
+      border-radius: 10px;
+      background: #2d8cff;
+      color: white;
+      cursor: pointer;
+      margin: 12px 0 18px;
+    }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+
+    canvas {
+      width: 100%;
+      height: 220px;
+      background: #000;
+      border: 1px solid #333;
+      border-radius: 14px;
+      display: block;
+    }
+
+    .meterBox {
+      width: 100%;
+      height: 18px;
+      background: #333;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+
+    .meter {
+      width: 0%;
+      height: 100%;
+      background: #2dff88;
+      transition: width 0.05s linear;
+    }
+
+    #status {
+      margin-top: 14px;
+      color: #ddd;
+      font-size: 14px;
+      min-height: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Mic Visualizer Test</h1>
+    <p>Tap the button, allow microphone access, then speak or play music near the phone.</p>
+    <button id="startBtn">Start Microphone</button>
+    <canvas id="canvas" width="700" height="220"></canvas>
+    <div class="meterBox"><div class="meter" id="meter"></div></div>
+    <div id="status">Waiting to start.</div>
+  </div>
+
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const meter = document.getElementById('meter');
+    const statusText = document.getElementById('status');
+
+    let audioContext;
+    let analyser;
+    let dataArray;
+    let animationId;
+
+    startBtn.addEventListener('click', async () => {
+      try {
+        startBtn.disabled = true;
+        statusText.textContent = 'Requesting microphone permission...';
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: false
+        });
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+
+        source.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        statusText.textContent = 'Microphone is active.';
+        draw();
+      } catch (err) {
+        startBtn.disabled = false;
+        statusText.textContent = 'Microphone error: ' + err.message;
+      }
+    });
+
+    function draw() {
+      animationId = requestAnimationFrame(draw);
+
+      analyser.getByteFrequencyData(dataArray);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const barCount = dataArray.length;
+      const barWidth = canvas.width / barCount;
+      let total = 0;
+
+      for (let i = 0; i < barCount; i++) {
+        const value = dataArray[i];
+        total += value;
+
+        const barHeight = (value / 255) * canvas.height;
+        const x = i * barWidth;
+        const y = canvas.height - barHeight;
+
+        const hue = (i / barCount) * 280;
+        ctx.fillStyle = `hsl(${hue}, 90%, 55%)`;
+        ctx.fillRect(x, y, barWidth - 1, barHeight);
+      }
+
+      const average = total / barCount;
+      const volumePercent = Math.min(100, Math.round((average / 120) * 100));
+      meter.style.width = volumePercent + '%';
+    }
+  </script>
+</body>
+</html>
